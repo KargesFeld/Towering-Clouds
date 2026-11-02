@@ -50,6 +50,12 @@ public class Config {
     @SerialEntry
     public float yRange = 64f;
     @SerialEntry
+    public boolean towersEnabled = true;
+    @SerialEntry
+    public float towerExponent = 2.5f;
+    @SerialEntry
+    public float stackSpacing = 10f;
+    @SerialEntry
     public float yOffset = 0f;
     @SerialEntry
     public float bottomSparsity = 0f;

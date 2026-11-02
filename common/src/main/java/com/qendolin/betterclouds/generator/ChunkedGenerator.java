@@ -433,6 +433,11 @@ public class ChunkedGenerator implements AutoCloseable {
                     float value = generator.sampler.sample(sampleX, sampleZ, cloudiness, options.fuzziness, options.samplingScale);
                     if (value <= 0) continue;
 
+                    if (options.towersEnabled) {
+                        bounds = genTowerColumn(sampleX, sampleZ, value, spacing, points, bounds);
+                        continue;
+                    }
+
                     for (int pass = 0; pass <= 1; pass++) {
                         float cloudHeight = value * value * options.yRange;
 
@@ -456,6 +461,56 @@ public class ChunkedGenerator implements AutoCloseable {
             }
 
             return new SamplePoints(bounds, points);
+        }
+
+        /**
+         * Height of a cloud column's top. A higher exponent keeps most of the field low
+         * and lets only the noise maxima grow into tall towers.
+         */
+        private float towerTop(float value) {
+            if (value <= 0) return 0;
+            return (float) Math.pow(Math.min(value, 1f), options.towerExponent) * options.yRange;
+        }
+
+        private float neighborTop(int sampleX, int sampleZ) {
+            float v = generator.sampler.sample(sampleX, sampleZ, cloudiness, options.fuzziness, options.samplingScale);
+            return towerTop(v);
+        }
+
+        /**
+         * Fills a column from a flat base (y = 0) up to its top with stacked puffs.
+         * Only the visible shell is emitted: puffs hidden behind all four neighbor
+         * columns are skipped, which keeps tall towers affordable.
+         */
+        private AABB genTowerColumn(int sampleX, int sampleZ, float value, float spacing,
+                                    ObjectArrayList<AABB> points, AABB bounds) {
+            float top = towerTop(value);
+            float step = Math.max(1f, options.stackSpacing);
+            int s = Math.max(1, Mth.floor(spacing));
+
+            float hiddenBelow = Math.min(
+                    Math.min(neighborTop(sampleX + s, sampleZ), neighborTop(sampleX - s, sampleZ)),
+                    Math.min(neighborTop(sampleX, sampleZ + s), neighborTop(sampleX, sampleZ - s))
+            ) - step;
+
+            int layers = Mth.ceil(top / step);
+            for (int layer = 0; layer <= layers; layer++) {
+                float y = Math.min(layer * step, top);
+                // always keep the base layer (visible from below) and the top
+                boolean isBase = layer == 0;
+                boolean isTop = layer == layers;
+                if (!isBase && !isTop && y < hiddenBelow) continue;
+
+                // less horizontal jitter towards the top -> rounder, "cauliflower" crowns
+                float jitter = options.randomPlacement * spacing * (1f - 0.5f * (top > 0 ? y / top : 0));
+                float x = sampleX + generator.sampler.randomOffsetX(sampleX, sampleZ, layer) * jitter;
+                float z = sampleZ + generator.sampler.randomOffsetZ(sampleX, sampleZ, layer) * jitter;
+
+                AABB pointAABB = new AABB(x, y, z, x, y, z);
+                bounds = bounds != null ? bounds.minmax(pointAABB) : pointAABB;
+                points.add(pointAABB);
+            }
+            return bounds;
         }
     }
 

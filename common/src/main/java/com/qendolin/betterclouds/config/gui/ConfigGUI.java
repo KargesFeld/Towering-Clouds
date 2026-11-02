@@ -36,6 +36,9 @@ public class ConfigGUI {
     public final Option<Float> sparsity;
     public final Option<Float> randomPlacement;
     public final Option<Float> yRange;
+    public final Option<Boolean> towersEnabled;
+    public final Option<Float> towerExponent;
+    public final Option<Float> stackSpacing;
     public final Option<Float> yOffset;
     public final Option<Config.TimeSource> timeSource;
     public final Option<Float> bottomSparsity;
@@ -121,7 +124,19 @@ public class ConfigGUI {
                 .build();
         this.yRange = createOption(float.class, "yRange")
                 .binding(defaults.yRange, () -> config.yRange, val -> config.yRange = val)
-                .customController(opt -> new FloatSliderController(opt, 0, 265, 1))
+                .customController(opt -> new FloatSliderController(opt, 0, 1024, 4))
+                .build();
+        this.towersEnabled = createOption(boolean.class, "towersEnabled")
+                .binding(defaults.towersEnabled, () -> config.towersEnabled, val -> config.towersEnabled = val)
+                .customController(TickBoxController::new)
+                .build();
+        this.towerExponent = createOption(float.class, "towerExponent")
+                .binding(defaults.towerExponent, () -> config.towerExponent, val -> config.towerExponent = val)
+                .customController(opt -> new FloatSliderController(opt, 1, 8, 0.1f))
+                .build();
+        this.stackSpacing = createOption(float.class, "stackSpacing")
+                .binding(defaults.stackSpacing, () -> config.stackSpacing, val -> config.stackSpacing = val)
+                .customController(opt -> new FloatSliderController(opt, 2, 64, 1))
                 .build();
         this.yOffset = createOption(float.class, "yOffset")
                 .binding(defaults.yOffset, () -> config.yOffset, val -> config.yOffset = val)
@@ -141,11 +156,11 @@ public class ConfigGUI {
                 .build();
         this.sizeXZ = createOption(float.class, "sizeXZ")
                 .binding(defaults.sizeXZ, () -> config.sizeXZ, val -> config.sizeXZ = val)
-                .customController(opt -> new FloatSliderController(opt, 2, 64, 1))
+                .customController(opt -> new FloatSliderController(opt, 2, 128, 1))
                 .build();
         this.sizeY = createOption(float.class, "sizeY")
                 .binding(defaults.sizeY, () -> config.sizeY, val -> config.sizeY = val)
-                .customController(opt -> new FloatSliderController(opt, 0, 32, 1))
+                .customController(opt -> new FloatSliderController(opt, 0, 96, 1))
                 .build();
         this.scaleFalloffMin = createOption(float.class, "scaleFalloffMin")
                 .binding(defaults.scaleFalloffMin, () -> config.scaleFalloffMin, val -> config.scaleFalloffMin = val)
@@ -250,6 +265,9 @@ public class ConfigGUI {
                 fuzziness,
                 sparsity,
                 yRange,
+                towersEnabled,
+                towerExponent,
+                stackSpacing,
                 yOffset,
                 timeSource,
                 bottomSparsity,
