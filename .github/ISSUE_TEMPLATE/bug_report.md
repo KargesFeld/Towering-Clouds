@@ -1,0 +1,47 @@
+---
+name: Bug report
+about: Report a general issue with this mod
+title: ''
+labels: bug
+assignees: orangishcat
+
+---
+
+## Describe the bug
+
+> A clear and concise description of what the bug is
+
+## To Reproduce
+
+> Steps to reproduce the behavior
+
+1.
+2.
+3.
+
+...
+
+### Expected behavior
+
+> A clear and concise description of what you expected to happen.
+
+### Screenshots
+
+> If applicable, add screenshots to help explain your problem.
+
+### System Environment
+
+- GPU:
+- Mod Version:
+- OS:
+
+*Optional*
+
+- Shader:
+- Other Mods:
+
+### Additional context
+
+> Add any other context about the problem here.
+
+**Make sure to check your issue thread often! I will often ask you for further information to help diagnose the issue.**

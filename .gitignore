@@ -1,0 +1,56 @@
+# gradle
+
+.gradle/
+build/
+out/
+classes/
+
+# eclipse
+
+*.launch
+
+# idea
+
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# vscode
+
+.settings/
+.vscode/
+bin/
+.classpath
+.project
+
+# macos
+
+*.DS_Store
+
+# fabric
+
+run
+run/
+runTest/
+
+# stuff
+
+*.blend1
+*.cap
+*.rdc
+*.xcf
+
+# secrets
+
+/secrets.properties
+
+# local files
+
+local/
+/renderdoc.bat
+changelog.txt
+changelog.txt.lock
+changelog.md
+/common/src/test/resources/
+tasks.md

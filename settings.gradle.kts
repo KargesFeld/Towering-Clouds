@@ -1,0 +1,36 @@
+pluginManagement {
+    repositories {
+        maven {
+            name = "Fabric"
+            url = uri("https://maven.fabricmc.net/")
+        }
+        maven {
+            name = "NeoForged"
+            url = uri("https://maven.neoforged.net/releases")
+        }
+        maven {
+            name = "Architectury"
+            url = uri("https://maven.architectury.dev/")
+        }
+        mavenCentral()
+        gradlePluginPortal()
+    }
+}
+
+plugins {
+    id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"
+}
+
+// Force gradle-idea-ext 1.4.1 (Groovy 4 / Gradle 9 compatible) over the 1.2
+// pulled in by net.neoforged.moddev. See: https://github.com/neoforged/ModDevGradle/issues/67
+buildscript {
+    repositories { gradlePluginPortal() }
+    dependencies {
+        classpath("gradle.plugin.org.jetbrains.gradle.plugin.idea-ext:gradle-idea-ext:1.4.1")
+    }
+}
+
+rootProject.name = "better-clouds"
+include("common")
+include("fabric")
+include("neoforge")

@@ -1,0 +1,158 @@
+package com.qendolin.betterclouds.rendering;
+
+import com.mojang.blaze3d.pipeline.RenderTarget;
+import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.renderpearl.api.commands.RenderPass;
+import com.mojang.renderpearl.api.textures.GpuTextureView;
+import com.qendolin.betterclouds.BetterCloudsStatic;
+import com.qendolin.betterclouds.config.ConfigManager;
+import com.qendolin.betterclouds.generator.ChunkedGenerator;
+import com.qendolin.betterclouds.mixin.duck.BiomeManagerDuck;
+import com.qendolin.betterclouds.mixin.provider.CloudinessProvider;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.client.renderer.culling.Frustum;
+import net.minecraft.client.renderer.fog.FogData;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.server.packs.resources.ResourceManager;
+import net.minecraft.world.attribute.EnvironmentAttributes;
+import net.minecraft.world.level.material.FogType;
+import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.timeline.Timeline;
+import net.minecraft.world.timeline.Timelines;
+import org.joml.Matrix4f;
+import org.joml.Vector3d;
+import org.jspecify.annotations.NonNull;
+
+import java.util.*;
+
+import static com.qendolin.betterclouds.compat.ProfilerWrapper.getProfiler;
+
+public abstract class CloudRenderer implements AutoCloseable {
+    /**
+     * this is where the noise texture wraps around i think.
+     * todo: document how i got to this value
+     */
+    public static final int CLOUD_TIME_PERIOD_TICKS = 320_000;
+
+    protected final Minecraft client = Minecraft.getInstance();
+    protected ChunkedGenerator generator;
+    protected ClientLevel level;
+
+    protected float cloudHeight;
+
+    protected boolean closed = false;
+
+    public CloudRenderer() {
+        reloadGenerator();
+    }
+
+    public long calculateDayTime() {
+        try {
+            Timeline timeline = level.registryAccess()
+                    .lookupOrThrow(Registries.TIMELINE)
+                    .getOrThrow(Timelines.OVERWORLD_DAY)
+                    .value();
+            return (long) ((double) timeline.getCurrentTicks(level.clockManager()) / timeline.periodTicks().orElse(24000) * 24000);
+        } catch (Exception e) {
+            return level.getDefaultClockTime() % 24000;
+        }
+    }
+
+    public void reload(ResourceManager resourceManager) {
+    }
+
+    public void reloadGenerator() {
+        generator = new ChunkedGenerator(getWorldSeed());
+    }
+
+    public @NonNull PrepareResult checkAndPrepare(Matrix4f viewMat, Matrix4f projMat, long cloudTicks, long clientTicks, float tickDelta, Vector3d cam, FogData fogData) {
+        if (!Objects.equals(level, client.level))
+            setLevel(client.level);
+        if (closed || level == null)
+            return PrepareResult.FALLBACK;
+
+        // Rendering clouds when underwater was making them very visible in unloaded chunks
+        if (client.gameRenderer.mainCamera().getFluidInCamera() != FogType.NONE)
+            return PrepareResult.NO_RENDER;
+
+        cloudHeight = level.environmentAttributes().getValue(EnvironmentAttributes.CLOUD_HEIGHT, new Vec3(cam.x, cam.y, cam.z)) + ConfigManager.instance().yOffset;
+        return prepare(viewMat, projMat, cloudTicks, clientTicks, tickDelta, cam, fogData);
+    }
+
+    public void checkAndRender(RenderPass pass, long ticks, float tickDelta, Vector3d cam, Vector3d frustumPos, Frustum frustum) {
+        if (level == null)
+            return;
+
+        render(pass, ticks, tickDelta, cam, frustumPos, frustum);
+    }
+
+    public abstract @NonNull PrepareResult prepare(Matrix4f viewMat, Matrix4f projMat, long cloudTicks, long clientTicks, float tickDelta, Vector3d cam, FogData fogData);
+
+    protected abstract void render(RenderPass pass, long cloudTicks, float tickDelta, Vector3d cam, Vector3d frustumPos, Frustum frustum);
+
+    protected abstract void onClose();
+
+    public RenderPass newRenderPass() {
+        RenderTarget cloudsTarget = client.gameRenderer.mainRenderTarget();
+        GpuTextureView cv = cloudsTarget.getColorTextureView(), dv = cloudsTarget.getDepthTextureView();
+        if (cv == null || dv == null) return null;
+        return RenderSystem.getDevice().createCommandEncoder().createRenderPass(
+                () -> BetterCloudsStatic.MODID + ":" + "renderClouds",
+                cv, Optional.empty(), dv, OptionalDouble.empty()
+        );
+    }
+
+    @Override
+    public void close() {
+        if (closed) {
+            BetterCloudsStatic.getLogger().warn(getClass().getSimpleName() + " is already closed, skipping close");
+            return;
+        }
+        try {
+            onClose();
+            generator.close();
+            TextureWrapper.closeAllWrappers();
+            closed = true;
+        } catch (Exception e) {
+            BetterCloudsStatic.getLogger().error("Error while closing " + getClass().getSimpleName(), e);
+        }
+    }
+
+    public long getWorldSeed() {
+        if (level == null) {
+            BetterCloudsStatic.getLogger().warn("No level when getWorldSeed was called?");
+            return 0;
+        }
+        long seed = ((BiomeManagerDuck) level.getBiomeManager()).betterclouds$biomeSeed();
+        BetterCloudsStatic.getLogger().debug("Biome seed: " + seed);
+        return seed;
+    }
+
+    public float getCloudHeight() {
+        return cloudHeight;
+    }
+
+    public void setLevel(ClientLevel level) {
+        this.level = level;
+    }
+
+    public void updateGenerator(Vector3d cam, long cloudTicks, long clientTicks, float tickDelta) {
+        float cloudiness = CloudinessProvider.getCloudiness(level, tickDelta);
+
+        generator.update(cam, cloudTicks, clientTicks, tickDelta, ConfigManager.instance(), cloudiness);
+        if (generator.canSwap()) {
+            getProfiler().popPush("swap");
+            generator.swap();
+            uploadPointsToBuffer();
+            getProfiler().popPush("render_setup");
+        }
+        if (generator.canGenerate() && !generator.generating()) {
+            getProfiler().popPush("generate_clouds");
+            generator.generate();
+            getProfiler().popPush("render_setup");
+        }
+    }
+
+    public abstract void uploadPointsToBuffer();
+}
